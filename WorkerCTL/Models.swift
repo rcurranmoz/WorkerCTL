@@ -9,6 +9,11 @@ struct Worker: Identifiable, Codable {
     let quarantineUntil: String?
     let recentErrors: Int?
     
+    // Not from API - set after fetching task status
+    var taskState: String?
+    var recentFailures: Int = 0  // Count of recent failed tasks
+    var hasRecentFailure: Bool { recentFailures > 0 }
+    
     var id: String { workerId }
     
     var lastActive: Date? {
@@ -26,9 +31,30 @@ struct Worker: Identifiable, Codable {
     }
     
     var isActive: Bool {
+        // If we have task state and it's running, definitely active
+        if let taskState = taskState, taskState == "running" {
+            return true
+        }
+        
+        // Otherwise check last active time
         guard let lastActive = lastActive else { return false }
-        // Consider active if seen in last 24 hours (workers in busy pools may take time between tasks)
-        return Date().timeIntervalSince(lastActive) < 86400
+        let daysSinceActive = Date().timeIntervalSince(lastActive) / 86400
+        return daysSinceActive < 7
+    }
+    
+    var isRecentlyActive: Bool {
+        // If task is running, it's recently active
+        if let taskState = taskState, taskState == "running" {
+            return true
+        }
+        
+        guard let lastActive = lastActive else { return false }
+        return Date().timeIntervalSince(lastActive) < 1800
+    }
+    
+    enum CodingKeys: String, CodingKey {
+        case workerGroup, workerId, firstClaim, lastDateActive
+        case latestTask, quarantineUntil, recentErrors
     }
 }
 

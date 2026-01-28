@@ -476,9 +476,10 @@ struct InfoView: View {
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.5))
                             
-                            Text("Active status: last seen within 24 hours")
+                            Text("Status: Green (30m) • Mint (2h) • Blue (24h) • Orange (7d) • Red (idle)")
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.5))
+                                .multilineTextAlignment(.center)
                         }
                         .padding()
                     }
