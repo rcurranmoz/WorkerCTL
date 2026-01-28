@@ -30,6 +30,8 @@ struct ContentView: View {
     @State private var workerPools = WorkerPool.defaultPools
     @State private var showingAddPool = false
     @State private var showingInfo = false
+    @State private var showingComparison = false
+    @State private var selectedPoolsForComparison: [WorkerPool] = []
     
     var body: some View {
         NavigationView {
@@ -113,6 +115,23 @@ struct ContentView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        if workerPools.count >= 2 {
+                            selectedPoolsForComparison = Array(workerPools.prefix(2))
+                            showingComparison = true
+                        }
+                    } label: {
+                        Image(systemName: "arrow.left.arrow.right")
+                            .foregroundStyle(
+                                workerPools.count >= 2 
+                                    ? LinearGradient(colors: [.green, .mint], startPoint: .topLeading, endPoint: .bottomTrailing)
+                                    : LinearGradient(colors: [.gray, .gray], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                    }
+                    .disabled(workerPools.count < 2)
+                }
+                
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button {
                         showingInfo = true
@@ -134,6 +153,9 @@ struct ContentView: View {
             }
             .sheet(isPresented: $showingInfo) {
                 InfoView()
+            }
+            .sheet(isPresented: $showingComparison) {
+                PoolComparisonView(pools: selectedPoolsForComparison)
             }
         }
         .preferredColorScheme(.dark)

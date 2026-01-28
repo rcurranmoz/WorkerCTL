@@ -16,6 +16,7 @@ struct WorkerListView: View {
     @State private var showingWorkerDetail = false
     @State private var fetchingTaskStates = false
     @State private var taskStateProgress: Double = 0
+    @State private var showingAnalytics = false
     
     enum FilterOption {
         case all, yes, no
@@ -63,6 +64,22 @@ struct WorkerListView: View {
         }
         .navigationTitle("\(workerType)")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showingAnalytics = true
+                } label: {
+                    Image(systemName: "chart.bar.fill")
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.blue, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+            }
+        }
         .refreshable {
             await loadWorkers()
         }
@@ -71,6 +88,9 @@ struct WorkerListView: View {
         }
         .sheet(item: $selectedWorker) { worker in
             WorkerDetailView(worker: worker, provisionerId: provisionerId, workerType: workerType)
+        }
+        .sheet(isPresented: $showingAnalytics) {
+            AnalyticsDashboardView(provisionerId: provisionerId, workerType: workerType, workers: workers)
         }
         .preferredColorScheme(.dark)
     }
