@@ -8,6 +8,22 @@ struct WorkerPool: Identifiable, Codable {
     let description: String
     var emoji: String
     
+    init(provisionerId: String, workerType: String, displayName: String, description: String, emoji: String) {
+        self.provisionerId = provisionerId
+        self.workerType = workerType
+        self.displayName = displayName
+        self.description = description
+        self.emoji = emoji
+    }
+    
+    init(from preset: PoolPreset) {
+        self.provisionerId = preset.provisionerId
+        self.workerType = preset.workerType
+        self.displayName = preset.displayName
+        self.description = preset.description
+        self.emoji = preset.emoji
+    }
+    
     static let defaultPools = [
         WorkerPool(
             provisionerId: "releng-hardware",
@@ -20,7 +36,7 @@ struct WorkerPool: Identifiable, Codable {
             provisionerId: "releng-hardware",
             workerType: "gecko-t-osx-1400-r8",
             displayName: "Intel Mac",
-            description: "Intel Xeon macOS workers",
+            description: "Intel macOS workers",
             emoji: "⚡️"
         ),
     ]
@@ -244,19 +260,21 @@ struct QuickAddPoolView: View {
     @Environment(\.dismiss) private var dismiss
     
     @State private var quickMode = true
-    @State private var selectedPreset = 0
+    @State private var selectedPreset: PoolPreset?
     @State private var customProvisionerId = "releng-hardware"
     @State private var customWorkerType = ""
     @State private var displayName = ""
     @State private var description = ""
     @State private var selectedEmoji = "🖥️"
+    @State private var selectedCategory: PoolCategory = .macOS
     
-    let presets = [
-        ("gecko-t-win10-64", "Windows 10 x64", "Windows 10 64-bit workers", "🪟"),
-        ("gecko-t-win11-64", "Windows 11 x64", "Windows 11 64-bit workers", "🪟"),
-        ("gecko-t-linux-1804", "Linux Ubuntu 18.04", "Ubuntu 18.04 Linux workers", "🐧"),
-        ("gecko-t-osx-1015", "macOS Catalina", "macOS 10.15 workers", "🍎"),
-    ]
+    private var categorizedPresets: [PoolCategory: [PoolPreset]] {
+        PoolPresets.categorized()
+    }
+    
+    private var presetsForSelectedCategory: [PoolPreset] {
+        categorizedPresets[selectedCategory] ?? []
+    }
     
     let emojiOptions = ["🚀", "⚡️", "🖥️", "💻", "🎮", "🔥", "⭐️", "🎯", "🪟", "🐧", "🍎", "🤖", "🦊"]
     
@@ -285,54 +303,68 @@ struct QuickAddPoolView: View {
                         .padding(.horizontal)
                         
                         if quickMode {
-                            // Quick mode - select from presets
+                            // Quick mode - select from presets by category
                             VStack(alignment: .leading, spacing: 16) {
-                                Text("Select a common pool:")
+                                Text("Select a pool:")
                                     .font(.headline)
                                     .foregroundColor(.white)
                                     .padding(.horizontal)
                                 
-                                ForEach(presets.indices, id: \.self) { index in
-                                    Button {
-                                        selectedPreset = index
-                                        let preset = presets[index]
-                                        customWorkerType = preset.0
-                                        displayName = preset.1
-                                        description = preset.2
-                                        selectedEmoji = preset.3
-                                    } label: {
-                                        HStack {
-                                            Text(presets[index].3)
-                                                .font(.system(size: 40))
-                                            
-                                            VStack(alignment: .leading) {
-                                                Text(presets[index].1)
-                                                    .font(.headline)
-                                                Text(presets[index].0)
-                                                    .font(.caption.monospaced())
-                                                    .foregroundColor(.blue)
-                                            }
-                                            
-                                            Spacer()
-                                            
-                                            if selectedPreset == index {
-                                                Image(systemName: "checkmark.circle.fill")
-                                                    .foregroundColor(.green)
-                                                    .font(.title2)
-                                            }
-                                        }
-                                        .foregroundColor(.white)
-                                        .padding()
-                                        .background(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .fill(selectedPreset == index ? Color.blue.opacity(0.2) : Color.white.opacity(0.1))
-                                        )
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12)
-                                                .stroke(selectedPreset == index ? Color.blue : Color.white.opacity(0.2), lineWidth: selectedPreset == index ? 2 : 1)
-                                        )
+                                // Category picker
+                                Picker("Category", selection: $selectedCategory) {
+                                    ForEach(PoolCategory.allCases, id: \.self) { category in
+                                        Text(category.displayName).tag(category)
                                     }
-                                    .padding(.horizontal)
+                                }
+                                .pickerStyle(.segmented)
+                                .padding(.horizontal)
+                                
+                                // Pools in selected category
+                                ScrollView {
+                                    VStack(spacing: 12) {
+                                        ForEach(presetsForSelectedCategory) { preset in
+                                            Button {
+                                                selectedPreset = preset
+                                                customWorkerType = preset.workerType
+                                                displayName = preset.displayName
+                                                description = preset.description
+                                                selectedEmoji = preset.emoji
+                                            } label: {
+                                                HStack {
+                                                    Text(preset.emoji)
+                                                        .font(.system(size: 32))
+                                                    
+                                                    VStack(alignment: .leading, spacing: 4) {
+                                                        Text(preset.displayName)
+                                                            .font(.headline)
+                                                            .foregroundColor(.white)
+                                                        Text(preset.workerType)
+                                                            .font(.caption.monospaced())
+                                                            .foregroundColor(.blue)
+                                                    }
+                                                    
+                                                    Spacer()
+                                                    
+                                                    if selectedPreset?.id == preset.id {
+                                                        Image(systemName: "checkmark.circle.fill")
+                                                            .foregroundColor(.green)
+                                                            .font(.title2)
+                                                    }
+                                                }
+                                                .padding()
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .fill(selectedPreset?.id == preset.id ? Color.blue.opacity(0.2) : Color.white.opacity(0.1))
+                                                )
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 12)
+                                                        .stroke(selectedPreset?.id == preset.id ? Color.blue : Color.white.opacity(0.2), lineWidth: selectedPreset?.id == preset.id ? 2 : 1)
+                                                )
+                                            }
+                                            .padding(.horizontal)
+                                        }
+                                    }
+                                    .padding(.bottom, 20)
                                 }
                             }
                         } else {
@@ -404,7 +436,7 @@ struct QuickAddPoolView: View {
             provisionerId: customProvisionerId,
             workerType: customWorkerType,
             displayName: displayName.isEmpty ? customWorkerType : displayName,
-            description: description.isEmpty ? "Custom worker pool" : description,
+            description: description.isEmpty ? customWorkerType : description,
             emoji: selectedEmoji
         )
         workerPools.append(newPool)

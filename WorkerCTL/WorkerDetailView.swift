@@ -8,6 +8,10 @@ struct WorkerDetailView: View {
     @StateObject private var api = TaskclusterAPI()
     @State private var taskStatus: TaskStatus?
     @State private var showingQuarantineAlert = false
+    @State private var isQuarantining = false
+    @State private var quarantineError: String?
+    @State private var quarantineSuccess = false
+    @State private var lastAction: String? // Track what action we just did
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -95,13 +99,66 @@ struct WorkerDetailView: View {
                         Label("View in Taskcluster", systemImage: "arrow.up.right.square")
                     }
                     
-                    // Quarantine action would go here (requires auth)
-                    // Button {
-                    //     showingQuarantineAlert = true
-                    // } label: {
-                    //     Label(worker.isQuarantined ? "Remove Quarantine" : "Quarantine Worker", systemImage: "exclamationmark.triangle")
-                    // }
-                    // .foregroundColor(.orange)
+                    // Quarantine toggle
+                    if worker.isQuarantined {
+                        Button(role: .destructive) {
+                            Task {
+                                await unquarantineWorker()
+                            }
+                        } label: {
+                            if isQuarantining {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("Removing Quarantine...")
+                                }
+                            } else {
+                                Label("Remove Quarantine", systemImage: "checkmark.circle")
+                            }
+                        }
+                        .disabled(isQuarantining)
+                    } else {
+                        Button(role: .destructive) {
+                            Task {
+                                await quarantineWorker()
+                            }
+                        } label: {
+                            if isQuarantining {
+                                HStack {
+                                    ProgressView()
+                                        .scaleEffect(0.8)
+                                    Text("Quarantining...")
+                                }
+                            } else {
+                                Label("Quarantine Worker (30 days)", systemImage: "exclamationmark.triangle.fill")
+                            }
+                        }
+                        .disabled(isQuarantining)
+                    }
+                }
+                
+                // Success/Error messages
+                if quarantineSuccess {
+                    Section {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text(lastAction == "quarantine" ? "Worker quarantined successfully" : "Quarantine removed successfully")
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+                
+                if let error = quarantineError {
+                    Section {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.red)
+                            Text(error)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                        }
+                    }
                 }
             }
             .navigationTitle("Worker Details")
@@ -126,6 +183,70 @@ struct WorkerDetailView: View {
             taskStatus = try await api.fetchTaskStatus(taskId: latestTask.taskId)
         } catch {
             print("Error loading task status: \(error)")
+        }
+    }
+    
+    private func quarantineWorker() async {
+        isQuarantining = true
+        quarantineError = nil
+        quarantineSuccess = false
+        lastAction = "quarantine"
+        
+        do {
+            try await api.quarantineWorker(
+                provisionerId: provisionerId,
+                workerType: workerType,
+                workerGroup: worker.workerGroup,
+                workerId: worker.workerId
+            )
+            
+            await MainActor.run {
+                quarantineSuccess = true
+                isQuarantining = false
+            }
+            
+            // Auto-dismiss after 2 seconds
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await MainActor.run {
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                quarantineError = error.localizedDescription
+                isQuarantining = false
+            }
+        }
+    }
+    
+    private func unquarantineWorker() async {
+        isQuarantining = true
+        quarantineError = nil
+        quarantineSuccess = false
+        lastAction = "unquarantine"
+        
+        do {
+            try await api.unquarantineWorker(
+                provisionerId: provisionerId,
+                workerType: workerType,
+                workerGroup: worker.workerGroup,
+                workerId: worker.workerId
+            )
+            
+            await MainActor.run {
+                quarantineSuccess = true
+                isQuarantining = false
+            }
+            
+            // Auto-dismiss after 2 seconds
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            await MainActor.run {
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                quarantineError = error.localizedDescription
+                isQuarantining = false
+            }
         }
     }
     

@@ -86,7 +86,12 @@ struct WorkerListView: View {
         .task {
             await loadWorkers()
         }
-        .sheet(item: $selectedWorker) { worker in
+        .sheet(item: $selectedWorker, onDismiss: {
+            // Refresh worker list when coming back (to show updated quarantine status)
+            Task {
+                await loadWorkers()
+            }
+        }) { worker in
             WorkerDetailView(worker: worker, provisionerId: provisionerId, workerType: workerType)
         }
         .sheet(isPresented: $showingAnalytics) {
@@ -125,16 +130,6 @@ struct WorkerListView: View {
             }
         }
         .padding()
-        .background(
-            LinearGradient(
-                colors: [
-                    Color(red: 0.15, green: 0.15, blue: 0.2).opacity(0.8),
-                    Color(red: 0.1, green: 0.1, blue: 0.15).opacity(0.8)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        )
     }
     
     private var filterBar: some View {
