@@ -342,7 +342,6 @@ struct PoolComparisonView: View {
         let score2 = a2.healthScore
         
         let winner = score1 > score2 ? pools[0] : pools[1]
-        let winnerScore = max(score1, score2)
         let diff = abs(score1 - score2)
         
         return VStack(spacing: 12) {

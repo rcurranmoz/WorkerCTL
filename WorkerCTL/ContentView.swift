@@ -1,12 +1,17 @@
 import SwiftUI
 
 struct WorkerPool: Identifiable, Codable {
-    let id = UUID()
+    var id: String { workerId }
     let provisionerId: String
     let workerType: String
     let displayName: String
     let description: String
     var emoji: String
+    
+    // Unique identifier based on provisioner and worker type
+    private var workerId: String {
+        "\(provisionerId)-\(workerType)"
+    }
     
     init(provisionerId: String, workerType: String, displayName: String, description: String, emoji: String) {
         self.provisionerId = provisionerId
@@ -43,11 +48,13 @@ struct WorkerPool: Identifiable, Codable {
 }
 
 struct ContentView: View {
-    @State private var workerPools = WorkerPool.defaultPools
+    @State private var workerPools: [WorkerPool] = []
     @State private var showingAddPool = false
     @State private var showingInfo = false
     @State private var showingComparison = false
     @State private var selectedPoolsForComparison: [WorkerPool] = []
+    
+    private let userDefaultsKey = "savedWorkerPools"
     
     var body: some View {
         NavigationView {
@@ -164,7 +171,9 @@ struct ContentView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingAddPool) {
+            .sheet(isPresented: $showingAddPool, onDismiss: {
+                savePoolsToUserDefaults()
+            }) {
                 QuickAddPoolView(workerPools: $workerPools)
             }
             .sheet(isPresented: $showingInfo) {
@@ -175,6 +184,27 @@ struct ContentView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .onAppear {
+            loadPoolsFromUserDefaults()
+        }
+    }
+    
+    // MARK: - Persistence Functions
+    
+    private func savePoolsToUserDefaults() {
+        if let encoded = try? JSONEncoder().encode(workerPools) {
+            UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
+        }
+    }
+    
+    private func loadPoolsFromUserDefaults() {
+        guard let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+              let decoded = try? JSONDecoder().decode([WorkerPool].self, from: data) else {
+            // First launch - load default pools
+            workerPools = WorkerPool.defaultPools
+            return
+        }
+        workerPools = decoded
     }
 }
 
